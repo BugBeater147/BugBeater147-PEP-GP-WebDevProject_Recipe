@@ -16,14 +16,38 @@ window.addEventListener("DOMContentLoaded", () => {
      * - Admin link and logout button
      * - Search input
     */
+    const adminLink = document.getElementById("admin-link");
+    const logoutButton = document.getElementById("logout-button");
+
+    const searchInput = document.getElementById("search-input");
+    const searchButton = document.getElementById("search-button");
+
+    const listEl = document.getElementById("recipe-list");
+
+    const addNameEl = document.getElementById("add-recipe-name-input");
+    const addInstrEl = document.getElementById("add-recipe-instructions-input");
+    const addSubmitEl = document.getElementById("add-recipe-submit-input");
+
+    const updNameEl = document.getElementById("update-recipe-name-input");
+    const updInstrEl = document.getElementById("update-recipe-instructions-input");
+    const updSubmitEl = document.getElementById("update-recipe-submit-input");
+
+    const delNameEl = document.getElementById("delete-recipe-name-input");
+    const delSubmitEl = document.getElementById("delete-recipe-submit-input");
 
     /*
      * TODO: Show logout button if auth-token exists in sessionStorage
      */
+    if (sessionStorage.getItem("auth-token")) {
+        logoutButton.style.display = "";
+    }
 
     /*
      * TODO: Show admin link if is-admin flag in sessionStorage is "true"
      */
+    if (sessionStorage.getItem("is-admin") === "true") {
+        adminLink.style.display = "";
+    }
 
     /*
      * TODO: Attach event handlers
@@ -33,10 +57,16 @@ window.addEventListener("DOMContentLoaded", () => {
      * - Search button → searchRecipes()
      * - Logout button → processLogout()
      */
+    addSubmitEl.addEventListener("click", addRecipe);
+    updSubmitEl.addEventListener("click", updateRecipe);
+    delSubmitEl.addEventListener("click", deleteRecipe);
+    searchButton.addEventListener("click", searchRecipes);
+    logoutButton.addEventListener("click", processLogout);
 
     /*
      * TODO: On page load, call getRecipes() to populate the list
      */
+    getRecipes();
 
 
     /**
@@ -47,7 +77,22 @@ window.addEventListener("DOMContentLoaded", () => {
      * - Handle fetch errors and alert user
      */
     async function searchRecipes() {
-        // Implement search logic here
+        const term = (searchInput.value || "").trim();
+        const token = sessionStorage.getItem("auth-token");
+        try {
+            if (!term) {
+                await getRecipes();
+                return;
+            }
+            const res = await fetch(`${BASE_URL}/recipes?name=${encodeURIComponent(term)}`, {
+                headers: { "Authorization": "Bearer " + token }
+            });
+            if (!res.ok) throw new Error("Search failed");
+            recipes = await res.json();
+            refreshRecipeList();
+        } catch (e) {
+            alert("Failed to search recipes.");
+        }
     }
 
     /**
@@ -59,7 +104,29 @@ window.addEventListener("DOMContentLoaded", () => {
      * - On success: clear inputs, fetch latest recipes, refresh the list
      */
     async function addRecipe() {
-        // Implement add logic here
+        const name = (addNameEl.value || "").trim();
+        const instructions = (addInstrEl.value || "").trim();
+        const token = sessionStorage.getItem("auth-token");
+        if (!name || !instructions) {
+            alert("Please provide name and instructions.");
+            return;
+        }
+        try {
+            const res = await fetch(`${BASE_URL}/recipes`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": "Bearer " + token
+                },
+                body: JSON.stringify({ name, instructions })
+            });
+            if (!res.ok) throw new Error("Add failed");
+            addNameEl.value = "";
+            addInstrEl.value = "";
+            await getRecipes();
+        } catch (e) {
+            alert("Failed to add recipe.");
+        }
     }
 
     /**
@@ -71,7 +138,35 @@ window.addEventListener("DOMContentLoaded", () => {
      * - On success: clear inputs, fetch latest recipes, refresh the list
      */
     async function updateRecipe() {
-        // Implement update logic here
+        const name = (updNameEl.value || "").trim();
+        const newInstructions = (updInstrEl.value || "").trim();
+        const token = sessionStorage.getItem("auth-token");
+        if (!name || !newInstructions) {
+            alert("Please provide name and updated instructions.");
+            return;
+        }
+        try {
+            if (!recipes.length) await getRecipes();
+            const target = recipes.find(r => (r.name || "").toLowerCase() === name.toLowerCase());
+            if (!target || target.id == null) {
+                alert("Recipe not found.");
+                return;
+            }
+            const res = await fetch(`${BASE_URL}/recipes/${encodeURIComponent(target.id)}`, {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": "Bearer " + token
+                },
+                body: JSON.stringify({ instructions: newInstructions })
+            });
+            if (!res.ok) throw new Error("Update failed");
+            updNameEl.value = "";
+            updInstrEl.value = "";
+            await getRecipes();
+        } catch (e) {
+            alert("Failed to update recipe.");
+        }
     }
 
     /**
@@ -82,7 +177,29 @@ window.addEventListener("DOMContentLoaded", () => {
      * - On success: refresh the list
      */
     async function deleteRecipe() {
-        // Implement delete logic here
+        const name = (delNameEl.value || "").trim();
+        const token = sessionStorage.getItem("auth-token");
+        if (!name) {
+            alert("Please provide a recipe name to delete.");
+            return;
+        }
+        try {
+            if (!recipes.length) await getRecipes();
+            const target = recipes.find(r => (r.name || "").toLowerCase() === name.toLowerCase());
+            if (!target || target.id == null) {
+                alert("Recipe not found.");
+                return;
+            }
+            const res = await fetch(`${BASE_URL}/recipes/${encodeURIComponent(target.id)}`, {
+                method: "DELETE",
+                headers: { "Authorization": "Bearer " + token }
+            });
+            if (!res.ok) throw new Error("Delete failed");
+            delNameEl.value = "";
+            await getRecipes();
+        } catch (e) {
+            alert("Failed to delete recipe.");
+        }
     }
 
     /**
@@ -92,7 +209,17 @@ window.addEventListener("DOMContentLoaded", () => {
      * - Call refreshRecipeList() to display
      */
     async function getRecipes() {
-        // Implement get logic here
+        const token = sessionStorage.getItem("auth-token");
+        try {
+            const res = await fetch(`${BASE_URL}/recipes`, {
+                headers: { "Authorization": "Bearer " + token }
+            });
+            if (!res.ok) throw new Error("Fetch failed");
+            recipes = await res.json();
+            refreshRecipeList();
+        } catch (e) {
+            alert("Failed to load recipes.");
+        }
     }
 
     /**
@@ -102,7 +229,12 @@ window.addEventListener("DOMContentLoaded", () => {
      * - Append to list container
      */
     function refreshRecipeList() {
-        // Implement refresh logic here
+        listEl.innerHTML = "";
+        recipes.forEach(r => {
+            const li = document.createElement("li");
+            li.textContent = `${r.name ?? "(no name)"} — ${r.instructions ?? ""}`;
+            listEl.appendChild(li);
+        });
     }
 
     /**
@@ -113,7 +245,19 @@ window.addEventListener("DOMContentLoaded", () => {
      * - On failure: alert the user
      */
     async function processLogout() {
-        // Implement logout logic here
+        const token = sessionStorage.getItem("auth-token");
+        try {
+            await fetch(`${BASE_URL}/logout`, {
+                method: "POST",
+                headers: { "Authorization": "Bearer " + token }
+            });
+        } catch (_) {
+            // ignore network errors on logout
+        } finally {
+            sessionStorage.removeItem("auth-token");
+            sessionStorage.removeItem("is-admin");
+            window.location.href = "../login/login-page.html";
+        }
     }
 
 });
